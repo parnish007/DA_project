@@ -1,0 +1,164 @@
+/* ------------------------------------------ */
+/* Global app styles */
+/* ------------------------------------------ */
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f5f7fa;
+    color: #1f2937;
+}
+
+/* ------------------------------------------ */
+/* Sidebar styling */
+/* ------------------------------------------ */
+.css-1d391kg {  /* Streamlit sidebar container class (might change with versions) */
+    background-color: #0f172a;
+    color: #f8fafc;
+    padding: 20px;
+}
+
+.css-1d391kg .stMarkdown, 
+.css-1d391kg .stTextInput input, 
+.css-1d391kg .stSlider, 
+.css-1d391kg .stSelectbox select {
+    color: #f8fafc;
+}
+
+/* Sidebar header */
+.css-1d391kg h2, .css-1d391kg h3 {
+    color: #f8fafc;
+    font-weight: 700;
+}
+
+/* Upload button */
+.stFileUploader > div > button {
+    background-color: #3b82f6;
+    color: #f8fafc;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-weight: 600;
+    transition: 0.3s;
+}
+
+.stFileUploader > div > button:hover {
+    background-color: #2563eb;
+}
+
+/* ------------------------------------------ */
+/* Page title & headers */
+/* ------------------------------------------ */
+h1, h2, h3 {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #1e40af;
+}
+
+h1 {
+    font-size: 2.5em;
+    margin-bottom: 0.5em;
+}
+
+h2 {
+    font-size: 2em;
+    margin-bottom: 0.5em;
+}
+
+/* ------------------------------------------ */
+/* Cards / panels for sections */
+/* ------------------------------------------ */
+.section-card {
+    background-color: #ffffff;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 25px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.section-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* ------------------------------------------ */
+/* DataFrame styling */
+/* ------------------------------------------ */
+.stDataFrame {
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.stDataFrame thead {
+    background-color: #1e3a8a;
+    color: #f8fafc;
+    font-weight: bold;
+}
+
+.stDataFrame tbody tr:hover {
+    background-color: #e0f2fe;
+}
+
+/* ------------------------------------------ */
+/* Buttons & Inputs */
+/* ------------------------------------------ */
+.stButton>button {
+    background-color: #3b82f6;
+    color: white;
+    border-radius: 8px;
+    padding: 10px 15px;
+    font-weight: bold;
+    transition: 0.3s;
+}
+
+.stButton>button:hover {
+    background-color: #2563eb;
+}
+
+/* Slider */
+.css-1aumxhk {
+    background-color: #e0f2fe !important;
+}
+
+/* Selectboxes / Dropdowns */
+.css-1hwfws3 {
+    border-radius: 8px;
+    background-color: #f1f5f9;
+    color: #1e293b;
+}
+
+/* ------------------------------------------ */
+/* Charts container */
+.stPlotlyChart, .stAltairChart, .stPydeckChart {
+    background-color: #ffffff;
+    padding: 10px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+/* ------------------------------------------ */
+/* Markdown links */
+a {
+    color: #3b82f6;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* ------------------------------------------ */
+/* Alerts / info boxes */
+.stAlert {
+    border-radius: 10px;
+    background-color: #fef3c7;
+    padding: 15px;
+}
+
+/* ------------------------------------------ */
+/* Footer / credits */
+footer {
+    color: #6b7280;
+    font-size: 0.9em;
+    text-align: center;
+    padding: 10px 0;
+}

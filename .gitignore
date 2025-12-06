@@ -1,0 +1,69 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pyo
+*.pyd
+*.env
+*.venv
+env/
+venv/
+.venv/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# VSCode / PyCharm / IDE settings
+.vscode/
+.idea/
+*.iml
+*.sublime-project
+*.sublime-workspace
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+
+# Python virtual environment
+.venv/
+venv/
+ENV/
+env/
+
+# Logs
+*.log
+project_errors.log
+
+# System files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Streamlit / cache
+.streamlit/
+*.db
+*.sqlite
+
+# OS generated files
+*.bak
+*.swp
+
+# Coverage reports
+.coverage
+htmlcov/
+*.cover
+*.py,cover
+
+# Test / pytest
+.pytest_cache/
+__pycache__/
+
+# Optional: ignore datasets (if large)
+data/
+*.csv
+*.xlsx
