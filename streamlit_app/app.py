@@ -1,22 +1,29 @@
-# streamlit_app/app.py
-
 import streamlit as st
-from app_backend import data_loader, DataCleaning, EDAEngine, VizEngine, safe_execute
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-# Load custom CSS
-st.markdown(
-    '<link rel="stylesheet" href="streamlit_app/assets/styles.css">', 
-    unsafe_allow_html=True
-)
-
-# ------------------------------
-# App Configuration
-# ------------------------------
 st.set_page_config(
     page_title="DA Project Dashboard",
     page_icon="🖥️",
     layout="wide",
 )
+
+# ------------------------------
+# Load custom CSS
+# ------------------------------
+st.markdown(
+    '<link rel="stylesheet" href="streamlit_app/assets/styles.css">',
+    unsafe_allow_html=True
+)
+
+# ------------------------------
+# Imports
+# ------------------------------
+from app_backend.data_loader import DataLoader
+from app_backend.data_cleaning import DataCleaning
+from app_backend.eda_analysis import EDAEngine
+from app_backend.viz_charts import VizEngine
 
 # ------------------------------
 # Sidebar Navigation
@@ -28,13 +35,13 @@ page = st.sidebar.radio(
 )
 
 # ------------------------------
-# File upload (persistent)
+# File uploader (persistent)
 # ------------------------------
 uploaded_file = st.sidebar.file_uploader("Upload your CSV dataset", type=["csv"])
 
 if uploaded_file:
     if "df" not in st.session_state or st.session_state.get("uploaded_file") != uploaded_file:
-        loader = data_loader(uploaded_file)
+        loader = DataLoader(uploaded_file)
         df = loader.df_copy()
         st.session_state.df = df
         st.session_state.uploaded_file = uploaded_file
@@ -47,13 +54,13 @@ else:
 # Helper function to wrap sections in cards
 # ------------------------------
 def card_section(title, icon, content_func, **kwargs):
-    st.markdown(f'<div class="section-card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.subheader(f"{icon} {title}")
     content_func(**kwargs)
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------
-# Page Content
+# Page Functions
 # ------------------------------
 def show_overview():
     if df is None:
@@ -65,13 +72,11 @@ def show_overview():
 
     def basic_overview():
         eda = EDAEngine(df)
-        overview = eda.get_overview()
-        st.write(overview)
+        st.write(eda.get_overview())
 
     def summary_stats():
         eda = EDAEngine(df)
-        stats = eda.summary_stats()
-        st.dataframe(stats)
+        st.dataframe(eda.summary_stats())
 
     def preview_rows():
         idx = st.number_input("Enter row index to preview", min_value=0, max_value=len(df)-1, value=0)
@@ -81,9 +86,8 @@ def show_overview():
         viz = VizEngine(df)
         numeric_cols = df.select_dtypes(include="number").columns.tolist()
         if numeric_cols:
-            col = st.selectbox("Select a numeric column for histogram", numeric_cols)
-            hist_fig = viz.histogram(col, bins=20)
-            st.pyplot(hist_fig)
+            col = st.selectbox("Select numeric column for histogram", numeric_cols)
+            st.pyplot(viz.histogram(col, bins=20))
         else:
             st.info("No numeric columns found for histogram.")
 
@@ -107,30 +111,10 @@ def show_visualizations():
             st.info("No numeric columns found.")
             return
         col = st.selectbox("Select numeric column for histogram", numeric_cols)
-        hist_fig = viz.histogram(col, bins=20, kde=True)
-        if isinstance(hist_fig, dict):
-            st.write("Histogram data & KDE preview:")
-            st.json(hist_fig)
-        else:
-            st.pyplot(hist_fig)
-
+        st.pyplot(viz.histogram(col, bins=20, kde=True))
         box_fig, box_info = viz.boxplot(col)
         st.pyplot(box_fig)
         st.write("Boxplot Info:", box_info)
-
-        if len(numeric_cols) >= 2:
-            x_col = st.selectbox("X-axis", numeric_cols, index=0)
-            y_col = st.selectbox("Y-axis", numeric_cols, index=1)
-            scatter_fig, scatter_data = viz.scatter(x_col, y_col)
-            st.pyplot(scatter_fig)
-            st.write(f"Number of points: {scatter_data['n_points']}")
-
-        pairplot_fig = viz.pairplot(cols=numeric_cols[:6])
-        st.pyplot(pairplot_fig)
-
-        corr_matrix = df[numeric_cols].corr()
-        heatmap_fig = viz.heatmap(corr_matrix, annot=True)
-        st.pyplot(heatmap_fig)
 
     def categorical_viz():
         if not categorical_cols:
@@ -152,27 +136,24 @@ def show_correlation():
     eda = EDAEngine(df)
     viz = VizEngine(df)
     numeric_cols = df.select_dtypes(include="number").columns.tolist()
-
     if not numeric_cols:
         st.warning("No numeric columns found for correlation analysis.")
         return
 
     def corr_matrix_section():
-        corr_method = st.selectbox("Select correlation method", ["pearson", "spearman", "kendall"])
-        corr_matrix = eda.correlation_matrix(method=corr_method)
+        method = st.selectbox("Select correlation method", ["pearson", "spearman", "kendall"])
+        corr_matrix = eda.correlation_matrix(method=method)
         st.dataframe(corr_matrix)
         return corr_matrix
 
     def top_corr_section(corr_matrix):
         target_col = st.selectbox("Select target column (optional)", [None] + numeric_cols)
         top_n = st.slider("Number of top correlations", 3, 20, 10)
-        top_corr = eda.top_correlations(target_col=target_col, n=top_n)
-        st.dataframe(top_corr)
+        st.dataframe(eda.top_correlations(target_col=target_col, n=top_n))
 
     def heatmap_section(corr_matrix):
         annot = st.checkbox("Annotate values on heatmap?", value=True)
-        heatmap_fig = viz.heatmap(corr_matrix, annot=annot)
-        st.pyplot(heatmap_fig)
+        st.pyplot(viz.heatmap(corr_matrix, annot=annot))
 
     corr_matrix = corr_matrix_section()
     card_section("Top Correlations", "🌟", top_corr_section, corr_matrix=corr_matrix)

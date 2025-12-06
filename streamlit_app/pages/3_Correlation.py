@@ -1,7 +1,7 @@
-# streamlit_app/pages/3_Correlation.py
-
 import streamlit as st
-from app_backend import data_loader, EDAEngine, VizEngine
+from app_backend.data_loader import DataLoader
+from app_backend.eda_analysis import EDAEngine
+from app_backend.viz_charts import VizEngine
 
 # ------------------------------
 # Page configuration
@@ -22,7 +22,7 @@ def card_section(title, icon, content_func, **kwargs):
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------
-# Section functions
+# Section function
 # ------------------------------
 def correlation_matrix_section(df):
     eda = EDAEngine(df)
@@ -32,6 +32,7 @@ def correlation_matrix_section(df):
         st.warning("No numeric columns found for correlation analysis.")
         return
 
+    # Correlation matrix
     corr_method = st.selectbox("Select correlation method", ["pearson", "spearman", "kendall"])
     corr_matrix = eda.correlation_matrix(method=corr_method)
     st.write("Correlation Matrix:")
@@ -41,12 +42,7 @@ def correlation_matrix_section(df):
     st.subheader("🌟 Top Correlations")
     target_col = st.selectbox("Select target column (optional)", [None] + numeric_cols)
     top_n = st.slider("Number of top correlations", 3, 20, 10)
-
-    if target_col is None:
-        top_corr = eda.top_correlations(target_col=None, n=top_n)
-    else:
-        top_corr = eda.top_correlations(target_col=target_col, n=top_n)
-
+    top_corr = eda.top_correlations(target_col=target_col, n=top_n)
     st.dataframe(top_corr)
 
     # Heatmap
@@ -56,7 +52,7 @@ def correlation_matrix_section(df):
     st.pyplot(heatmap_fig)
 
 # ------------------------------
-# Main
+# Main function
 # ------------------------------
 def main():
     st.title("📉 Correlation Analysis")
@@ -69,13 +65,15 @@ def main():
         """
     )
 
+    # ------------------------------
     # File uploader
+    # ------------------------------
     uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"], key="corr_uploader")
 
     if uploaded_file:
-        # Persist dataset in session state
+        # Load dataset if not already in session or if a new file is uploaded
         if "df" not in st.session_state or st.session_state.get("uploaded_file") != uploaded_file:
-            loader = data_loader(uploaded_file)
+            loader = DataLoader(uploaded_file)
             df = loader.df_copy()
             st.session_state.df = df
             st.session_state.uploaded_file = uploaded_file
@@ -84,9 +82,12 @@ def main():
 
         # Render correlation section in a card
         card_section("Correlation Analysis", "📉", correlation_matrix_section, df=df)
+
     else:
         st.info("Please upload a CSV file to analyze correlations.")
 
-# Call main
+# ------------------------------
+# Run
+# ------------------------------
 if __name__ == "__main__":
     main()

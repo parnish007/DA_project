@@ -1,6 +1,6 @@
 # eda_analysis.py
 import math
-from typing import List, Optional, Tuple, Dict, Any
+from typing import List, Optional, Dict, Any
 import pandas as pd
 import numpy as np
 
@@ -24,16 +24,11 @@ class EDAEngine:
     def __init__(self, df: pd.DataFrame, sample_limit: Optional[int] = None):
         if df is None or (hasattr(df, "empty") and df.empty):
             raise ValueError("df must be a non-empty pandas DataFrame")
-        # store a copy to avoid accidental external mutation
         self.df = df.copy()
-        # sample_limit: if provided, many heavy ops will use a random subset to speed up
         self.sample_limit = int(sample_limit) if sample_limit is not None else None
 
-        # derived cached lists
         self.numeric_cols = self._get_numeric_cols()
         self.categorical_cols = self._get_categorical_cols()
-
-        # simple in-memory cache for expensive calculations
         self.summary_cache: Dict[str, Any] = {}
 
     # -------------------------
@@ -48,7 +43,6 @@ class EDAEngine:
         return self.df.select_dtypes(include=[np.number]).columns.tolist()
 
     def _get_categorical_cols(self) -> List[str]:
-        # treat object, category, bool as categorical for UI purposes
         return self.df.select_dtypes(include=['object', 'category', 'bool']).columns.tolist()
 
     def _validate_column(self, column: str):
@@ -91,19 +85,21 @@ class EDAEngine:
     # -------------------------
     def summary_stats(self, columns: Optional[List[str]] = None,
                       include_percentiles: List[float] = [0.25, 0.5, 0.75]) -> pd.DataFrame:
-        # default -> all numeric columns
         if columns is None:
             columns = self._get_numeric_cols()
         else:
             for c in columns:
                 self._validate_column(c)
 
+        if not columns:
+            return pd.DataFrame({"Info": ["No numeric columns to summarize"]})
+
         sample = self._sample_df()
-        # use describe and then add desired percentiles if they are custom
+        if sample.empty:
+            return pd.DataFrame({"Info": ["No data available for summary"]})
+
         stats = sample[columns].describe(percentiles=include_percentiles).T
         stats = stats.rename(columns={"50%": "median"}) if "50%" in stats.columns else stats
-        # ensure common order: count, mean, std, min, percentiles..., max
-        # keep dtype info in a column
         stats["dtype"] = sample[columns].dtypes.astype(str).values
         return stats
 
@@ -146,20 +142,20 @@ class EDAEngine:
                            clamp_threshold: Optional[float] = None) -> pd.DataFrame:
         if numeric_only:
             cols = self._get_numeric_cols()
+            if not cols:
+                return pd.DataFrame({"Info": ["No numeric columns for correlation"]})
+            sample = self._sample_df()
+            if sample.empty:
+                return pd.DataFrame({"Info": ["No data available for correlation"]})
+            corr = sample[cols].corr(method=method)
         else:
-            # naive attempt: coerce non-numeric to codes (beginner-friendly)
             cols = self.df.columns.tolist()
             temp = self.df.copy()
             for c in cols:
                 if not pd.api.types.is_numeric_dtype(temp[c]):
                     temp[c] = pd.Categorical(temp[c]).codes
             corr = temp[cols].corr(method=method)
-            if clamp_threshold is not None:
-                corr = corr.where(corr.abs() >= clamp_threshold, other=0.0)
-            return corr
 
-        sample = self._sample_df()
-        corr = sample[cols].corr(method=method)
         if clamp_threshold is not None:
             corr = corr.where(corr.abs() >= clamp_threshold, other=0.0)
         return corr
@@ -169,6 +165,8 @@ class EDAEngine:
     # -------------------------
     def top_correlations(self, target_col: Optional[str] = None, n: int = 10, method: str = "pearson") -> pd.DataFrame:
         corr = self.correlation_matrix(method=method, numeric_only=True)
+        if "Info" in corr.columns:
+            return corr
         if target_col:
             self._validate_column(target_col)
             if target_col not in corr.columns:
@@ -178,12 +176,10 @@ class EDAEngine:
             result.columns = ["feature", "corr"]
             return result
         else:
-            # strongest absolute correlations pairs
             m = corr.abs().where(~np.eye(len(corr), dtype=bool)).stack().sort_values(ascending=False)
             top = m.head(n)
             pairs = top.reset_index()
             pairs.columns = ["feature_a", "feature_b", "abs_corr"]
-            # attach signed correlation
             pairs["corr"] = pairs.apply(lambda r: corr.loc[r["feature_a"], r["feature_b"]], axis=1)
             return pairs[["feature_a", "feature_b", "corr"]]
 
@@ -193,11 +189,12 @@ class EDAEngine:
     def distribution_stats(self, column: str, bins: int = 30, kde: bool = False) -> dict:
         self._validate_column(column)
         if not pd.api.types.is_numeric_dtype(self.df[column]):
-            raise TypeError("distribution_stats requires a numeric column")
-
+            return {"Info": "distribution_stats requires a numeric column"}
         series = self._sample_df()[column].dropna()
-        hist_counts, hist_bins = np.histogram(series, bins=bins)
+        if series.empty:
+            return {"Info": "No data available for distribution"}
 
+        hist_counts, hist_bins = np.histogram(series, bins=bins)
         out = {
             "hist_counts": hist_counts.tolist(),
             "hist_bins": hist_bins.tolist(),
@@ -205,12 +202,9 @@ class EDAEngine:
             "kurtosis": float(series.kurtosis()),
         }
 
-        # simple IQR-based outlier count
-        q1 = series.quantile(0.25)
-        q3 = series.quantile(0.75)
+        q1, q3 = series.quantile([0.25, 0.75])
         iqr = q3 - q1
-        lower = q1 - 1.5 * iqr
-        upper = q3 + 1.5 * iqr
+        lower, upper = q1 - 1.5 * iqr, q3 + 1.5 * iqr
         out["outlier_counts"] = int(((series < lower) | (series > upper)).sum())
 
         if kde:
@@ -225,7 +219,6 @@ class EDAEngine:
                     out["kde_y"] = ys.tolist()
                 except Exception as e:
                     out["kde_error"] = str(e)
-
         return out
 
     # -------------------------
@@ -234,9 +227,11 @@ class EDAEngine:
     def boxplot_summary(self, column: str) -> dict:
         self._validate_column(column)
         if not pd.api.types.is_numeric_dtype(self.df[column]):
-            raise TypeError("boxplot_summary requires a numeric column")
-
+            return {"Info": "boxplot_summary requires a numeric column"}
         series = self.df[column].dropna()
+        if series.empty:
+            return {"Info": "No data available for boxplot"}
+
         q1 = float(series.quantile(0.25))
         median = float(series.quantile(0.5))
         q3 = float(series.quantile(0.75))
@@ -261,16 +256,13 @@ class EDAEngine:
         }
 
     # -------------------------
-    # 9. Pairwise scatter (returns primitives)
+    # 9. Pairwise scatter
     # -------------------------
     def pairwise_scatter(self, sample_fraction: float = 0.1, cols: Optional[List[str]] = None, max_plots: int = 9) -> List[dict]:
         if cols is None:
-            # choose top numeric cols by variance
             numeric = self._get_numeric_cols()
-            variances = self.df[numeric].var().sort_values(ascending=False)
-            cols = variances.index.tolist()[:min(len(variances), 6)]
-
-        # create pairs (simple)
+            variances = self.df[numeric].var().sort_values(ascending=False) if numeric else pd.Series()
+            cols = variances.index.tolist()[:min(len(variances), 6)] if not variances.empty else []
         pairs = []
         for i in range(len(cols)):
             for j in range(i + 1, len(cols)):
@@ -279,13 +271,8 @@ class EDAEngine:
                     break
             if len(pairs) >= max_plots:
                 break
-
-        # sample once
-        if not (0 < sample_fraction <= 1):
-            sample_fraction = 1.0
         n = max(1, int(len(self.df) * sample_fraction))
         sample_df = self.df.sample(n=n, random_state=42) if n < len(self.df) else self.df
-
         out = []
         for x_col, y_col in pairs:
             out.append({
@@ -322,17 +309,14 @@ class EDAEngine:
         self._validate_column(datetime_col)
         ser = pd.to_datetime(self.df[datetime_col], errors='coerce')
         if ser.isna().all():
-            raise TypeError(f"Column '{datetime_col}' cannot be parsed as datetime")
-
+            return pd.DataFrame({"Info": [f"Column '{datetime_col}' cannot be parsed as datetime"]})
         temp = self.df.copy()
         temp[datetime_col] = ser
         temp = temp.set_index(datetime_col)
-
         if value_cols is None:
             value_cols = self._get_numeric_cols()
-
-        agg_func = getattr(pd.core.groupby.SeriesGroupBy, agg, None)
-        # use pandas resample + agg
+        if not value_cols:
+            return pd.DataFrame({"Info": ["No numeric columns for time series aggregation"]})
         result = temp[value_cols].resample(freq).agg(agg)
         return result
 
@@ -342,7 +326,6 @@ class EDAEngine:
     def groupby_aggregations(self, group_cols: List[str], agg_spec: dict) -> pd.DataFrame:
         for g in group_cols:
             self._validate_column(g)
-        # agg_spec should be a mapping column -> agg or list of aggs
         result = self.df.groupby(group_cols).agg(agg_spec).reset_index()
         return result
 
@@ -354,7 +337,6 @@ class EDAEngine:
         for c in self.df.columns:
             dtype = str(self.df[c].dtype)
             sample_values = self.df[c].dropna().unique()[:5].tolist()
-            # simple heuristics
             if pd.api.types.is_numeric_dtype(self.df[c]):
                 suggested = "numeric"
             elif pd.api.types.is_bool_dtype(self.df[c]):
@@ -362,12 +344,10 @@ class EDAEngine:
             elif pd.api.types.is_datetime64_any_dtype(self.df[c]) or "datetime" in dtype:
                 suggested = "datetime"
             elif pd.api.types.is_categorical_dtype(self.df[c]) or pd.api.types.is_object_dtype(self.df[c]):
-                # check if high cardinality
                 uniq = self.df[c].nunique(dropna=True)
                 suggested = "categorical (high_cardinality)" if uniq > 50 else "categorical"
             else:
                 suggested = "other"
-
             rows.append({
                 "column": c,
                 "dtype": dtype,
@@ -378,20 +358,12 @@ class EDAEngine:
         return pd.DataFrame(rows)
 
     # -------------------------
-    # 14. Export report (basic)
+    # 14. Export report
     # -------------------------
     def export_report(self, format: str = 'csv', path: Optional[str] = None, include_plots: bool = False) -> Any:
-        """
-        Very simple exporter:
-        - for 'csv' returns bytes of df.to_csv()
-        - for 'json' returns df.to_json(orient='records')
-        - if path provided, writes to path and returns path
-        Note: include_plots is not implemented here (frontend should render plots).
-        """
         fmt = format.lower()
         if fmt not in {'csv', 'json', 'html'}:
             raise ValueError("format must be one of 'csv','json','html'")
-
         cleaned = self.df.copy()
         if path:
             if fmt == 'csv':
@@ -401,12 +373,9 @@ class EDAEngine:
             elif fmt == 'html':
                 cleaned.to_html(path, index=False)
             return path
-
-        # return in-memory representation
         if fmt == 'csv':
             return cleaned.to_csv(index=False).encode('utf-8')
         elif fmt == 'json':
             return cleaned.to_json(orient='records', date_format='iso')
         else:
             return cleaned.to_html(index=False)
-
